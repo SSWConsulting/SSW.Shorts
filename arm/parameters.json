@@ -1,0 +1,27 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "connections_ftp_name": {
+            "value": null
+        },
+        "connections_office365_name": {
+            "value": null
+        },
+        "workflows_GetForecast_name": {
+            "value": null
+        },
+        "workflows_SydneyEmail_name": {
+            "value": null
+        },
+        "workflows_BrisbaneEmail_name": {
+            "value": null
+        },
+        "workflows_MelbourneEmail_name": {
+            "value": null
+        },
+        "workflows_SendShortsEmail_name": {
+            "value": null
+        }
+    }
+}

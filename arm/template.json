@@ -1,0 +1,543 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "connections_ftp_name": {
+            "defaultValue": "ftp",
+            "type": "String"
+        },
+        "connections_office365_name": {
+            "defaultValue": "office365",
+            "type": "String"
+        },
+        "workflows_GetForecast_name": {
+            "defaultValue": "GetForecast",
+            "type": "String"
+        },
+        "workflows_SydneyEmail_name": {
+            "defaultValue": "SydneyEmail",
+            "type": "String"
+        },
+        "workflows_BrisbaneEmail_name": {
+            "defaultValue": "BrisbaneEmail",
+            "type": "String"
+        },
+        "workflows_MelbourneEmail_name": {
+            "defaultValue": "MelbourneEmail",
+            "type": "String"
+        },
+        "workflows_SendShortsEmail_name": {
+            "defaultValue": "SendShortsEmail",
+            "type": "String"
+        }
+    },
+    "variables": {
+        "location": "[resourceGroup().location]",
+        "managedApiPrefix": "[concat('/subscriptions/',subscription().subscriptionId,'/providers/Microsoft.Web/locations/',variables('location'),'/managedApis/')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[parameters('connections_ftp_name')]",
+            "location": "[variables('location')]",
+            "properties": {
+                "displayName": "BOM",
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat(variables('managedApiPrefix'), parameters('connections_ftp_name'))]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[parameters('connections_office365_name')]",
+            "location": "[variables('location')]",
+            "properties": {
+                "displayName": "NoReply",
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat(variables('managedApiPrefix'), parameters('connections_office365_name'))]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_BrisbaneEmail_name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('workflows_SendShortsEmail_name'))]"
+            ],
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "frequency": "Week",
+                                "interval": 1,
+                                "schedule": {
+                                    "hours": [
+                                        "6"
+                                    ],
+                                    "minutes": [
+                                        0
+                                    ],
+                                    "weekDays": [
+                                        "Monday",
+                                        "Tuesday",
+                                        "Wednesday",
+                                        "Thursday"
+                                    ]
+                                },
+                                "timeZone": "E. Australia Standard Time"
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "SendShortsEmail": {
+                            "runAfter": {},
+                            "type": "Workflow",
+                            "inputs": {
+                                "body": {
+                                    "BOMCode": "IDQ10095",
+                                    "BOMLocation": "Brisbane",
+                                    "TemperatureWhenShortsAreAllowed": 30,
+                                    "emailTo": "SSWBrisbaneAll@ssw.com.au"
+                                },
+                                "host": {
+                                    "triggerName": "manual",
+                                    "workflow": {
+                                        "id": "[resourceId('Microsoft.Logic/workflows', parameters('workflows_SendShortsEmail_name'))]"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {}
+            }
+        },
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_GetForecast_name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', parameters('connections_ftp_name'))]"
+            ],
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {
+                                    "properties": {
+                                        "BOMCode": {
+                                            "type": "string"
+                                        },
+                                        "BOMLocation": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Forecast": {
+                            "runAfter": {
+                                "ForecastXPath": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Compose",
+                            "inputs": "@first(xpath(xml(body('Get_file_content')),outputs('ForecastXPath')))"
+                        },
+                        "ForecastXPath": {
+                            "runAfter": {
+                                "Get_file_content": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Compose",
+                            "inputs": "@concat('//forecast/area[@description=\"',triggerBody()?['BOMLocation'],'\"][@type=\"metropolitan\"]/forecast-period[@index=\"0\"]/text[@type=\"forecast\"]/text()')"
+                        },
+                        "Get_file_content": {
+                            "runAfter": {},
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['ftp']['connectionId']"
+                                    }
+                                },
+                                "method": "get",
+                                "path": "/datasets/default/files/@{encodeURIComponent(encodeURIComponent('/gen/fwo/',triggerBody()?['BOMCode'],'.xml'))}/content",
+                                "queries": {
+                                    "inferContentType": true
+                                }
+                            }
+                        },
+                        "Response": {
+                            "runAfter": {
+                                "Forecast": [
+                                    "Succeeded"
+                                ],
+                                "Temperature": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Response",
+                            "kind": "Http",
+                            "inputs": {
+                                "body": {
+                                    "forecast": "@{outputs('Forecast')}",
+                                    "temperature": "@outputs('Temperature')"
+                                },
+                                "schema": {
+                                    "properties": {
+                                        "forecast": {
+                                            "type": "string"
+                                        },
+                                        "temperature": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "statusCode": 200
+                            }
+                        },
+                        "Temperature": {
+                            "runAfter": {
+                                "TemperatureXPath": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Compose",
+                            "inputs": "@coalesce(first(xpath(xml(body('Get_file_content')),outputs('TemperatureXPath'))),'0')"
+                        },
+                        "TemperatureXPath": {
+                            "runAfter": {
+                                "Get_file_content": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Compose",
+                            "inputs": "@concat('//forecast/area[@description=\"',triggerBody()?['BOMLocation'],'\"][@type=\"location\"]/forecast-period[starts-with(@start-time-local,\"',convertFromUtc(utcNow(),'AUS Eastern Standard Time','yyyy-MM-dd'),'\")]/element[@type=\"air_temperature_maximum\"][@units=\"Celsius\"]/text()')"
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "ftp": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('connections_ftp_name'))]",
+                                "connectionName": "ftp",
+                                "id": "[concat(variables('managedApiPrefix'),'ftp')]"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_MelbourneEmail_name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('workflows_SendShortsEmail_name'))]"
+            ],
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "frequency": "Week",
+                                "interval": 1,
+                                "schedule": {
+                                    "hours": [
+                                        "6"
+                                    ],
+                                    "minutes": [
+                                        0
+                                    ],
+                                    "weekDays": [
+                                        "Monday",
+                                        "Tuesday",
+                                        "Wednesday",
+                                        "Thursday"
+                                    ]
+                                },
+                                "timeZone": "AUS Eastern Standard Time"
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "SendShortsEmail": {
+                            "runAfter": {},
+                            "type": "Workflow",
+                            "inputs": {
+                                "body": {
+                                    "BOMCode": "IDV10450",
+                                    "BOMLocation": "Melbourne",
+                                    "TemperatureWhenShortsAreAllowed": 30,
+                                    "emailTo": "SSWMelbourneAll@ssw.com.au"
+                                },
+                                "host": {
+                                    "triggerName": "manual",
+                                    "workflow": {
+                                        "id": "[resourceId('Microsoft.Logic/workflows', parameters('workflows_SendShortsEmail_name'))]"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {}
+            }
+        },
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_SydneyEmail_name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('workflows_SendShortsEmail_name'))]"
+            ],
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "frequency": "Week",
+                                "interval": 1,
+                                "schedule": {
+                                    "hours": [
+                                        "6"
+                                    ],
+                                    "minutes": [
+                                        0
+                                    ],
+                                    "weekDays": [
+                                        "Monday",
+                                        "Tuesday",
+                                        "Wednesday",
+                                        "Thursday"
+                                    ]
+                                },
+                                "timeZone": "AUS Eastern Standard Time"
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "SendShortsEmail": {
+                            "runAfter": {},
+                            "type": "Workflow",
+                            "inputs": {
+                                "body": {
+                                    "BOMCode": "IDN10064",
+                                    "BOMLocation": "Sydney",
+                                    "TemperatureWhenShortsAreAllowed": 30,
+                                    "emailTo": "sswsydneyall@ssw.com.au"
+                                },
+                                "host": {
+                                    "triggerName": "manual",
+                                    "workflow": {
+                                        "id": "[resourceId('Microsoft.Logic/workflows', parameters('workflows_SendShortsEmail_name'))]"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {}
+            }
+        },
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_SendShortsEmail_name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('workflows_GetForecast_name'))]",
+                "[resourceId('Microsoft.Web/connections', parameters('connections_office365_name'))]"
+            ],
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {
+                                    "properties": {
+                                        "BOMCode": {
+                                            "type": "string"
+                                        },
+                                        "BOMLocation": {
+                                            "type": "string"
+                                        },
+                                        "TemperatureWhenShortsAreAllowed": {
+                                            "type": "integer"
+                                        },
+                                        "emailTo": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Condition": {
+                            "actions": {
+                                "Response": {
+                                    "runAfter": {
+                                        "Send_an_email_from_a_shared_mailbox_(V2)": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Response",
+                                    "kind": "Http",
+                                    "inputs": {
+                                        "body": {
+                                            "forecast": "@{body('GetForecast')?['forecast']}",
+                                            "sentEmail": true,
+                                            "temperature": "@body('GetForecast')?['temperature']"
+                                        },
+                                        "statusCode": 200
+                                    }
+                                },
+                                "Send_an_email_from_a_shared_mailbox_(V2)": {
+                                    "runAfter": {},
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "Body": "<p>Hi All,<br>\n<br>\nThe maximum temperature for today is @{body('GetForecast')['temperature']}.<br>\n<br>\nFeel free to wear shorts if you like 🌞 (hope you haven't skipped leg day 😜)<br>\n<br>\nIf you decide against it, then don't forget the SSW dress code 👔 applies as usual (e.g. dress up on Monday and Tuesday - no jeans).<br>\n<br>\nToday's forecast:<br>\n@{body('GetForecast')['forecast']}<br>\n<br>\nSophie<br>\n--Powered by SSW.Shorts<br>\n<br>\n&lt;This email was sent as per: https://rules.ssw.com.au/do-you-have-a-dress-code &gt;<br>\n</p>",
+                                            "MailboxAddress": "sophiebelle@ssw.com.au",
+                                            "Subject": "SSW @{triggerBody()?['BOMLocation']} - 🩳 Shorts Today! (Over @{triggerBody()?['TemperatureWhenShortsAreAllowed']})",
+                                            "To": "@triggerBody()?['emailTo']"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['office365']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/v2/SharedMailbox/Mail"
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "GetForecast": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "else": {
+                                "actions": {
+                                    "Response_2": {
+                                        "runAfter": {},
+                                        "type": "Response",
+                                        "kind": "Http",
+                                        "inputs": {
+                                            "body": {
+                                                "forecast": "@{body('GetForecast')?['forecast']}",
+                                                "sentEmail": false,
+                                                "temperature": "@body('GetForecast')?['temperature']"
+                                            },
+                                            "statusCode": 200
+                                        }
+                                    }
+                                }
+                            },
+                            "expression": {
+                                "and": [
+                                    {
+                                        "greaterOrEquals": [
+                                            "@int(body('GetForecast')?['temperature'])",
+                                            "@triggerBody()?['TemperatureWhenShortsAreAllowed']"
+                                        ]
+                                    }
+                                ]
+                            },
+                            "type": "If"
+                        },
+                        "GetForecast": {
+                            "runAfter": {},
+                            "type": "Workflow",
+                            "inputs": {
+                                "body": {
+                                    "BOMCode": "@triggerBody()?['BOMCode']",
+                                    "BOMLocation": "@triggerBody()?['BOMLocation']"
+                                },
+                                "host": {
+                                    "triggerName": "manual",
+                                    "workflow": {
+                                        "id": "[resourceId('Microsoft.Logic/workflows', parameters('workflows_GetForecast_name'))]"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "office365": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('connections_office365_name'))]",
+                                "connectionName": "office365",
+                                "id": "[concat(variables('managedApiPrefix'),'office365')]"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
