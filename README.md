@@ -7,13 +7,14 @@ This is an ARM template with some Logic Apps to notify our offices that it is ho
 * ARM Templates
 * [Australian Bureau of Meteorology's FTP Weather Service](http://www.bom.gov.au/catalogue/anon-ftp.shtml)
 
-![Dependency diagram](https://github.com/SSWConsulting/SSW.Shorts/raw/master/_overview.png)
+![Dependency diagram](https://github.com/SSWConsulting/SSW.Shorts/raw/master/docs/overview.png)
 
 ## Getting Started
 1. Setup an Azure subscription (if you don't already have one)
-1. [Install the Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
+1. [Install the Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest) (or use their Docker image)
 1. Clone the repository
-1. Run the deploy script for your environment
+1. Run the deploy script
+1. Authenticate the email connector (or change it to a static result to test)
 
 ## Support
 
