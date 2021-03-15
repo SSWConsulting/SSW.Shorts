@@ -25,6 +25,10 @@
         "workflows_MelbourneEmail_name": {
             "defaultValue": "MelbourneEmail",
             "type": "String"
+        },        
+        "workflows_NewcastleEmail_name": {
+            "defaultValue": "NewcastleEmail",
+            "type": "String"
         },
         "workflows_SendShortsEmail_name": {
             "defaultValue": "SendShortsEmail",
@@ -110,6 +114,69 @@
                                     "BOMLocation": "Brisbane",
                                     "TemperatureWhenShortsAreAllowed": 30,
                                     "emailTo": "SSWBrisbaneAll@ssw.com.au"
+                                },
+                                "host": {
+                                    "triggerName": "manual",
+                                    "workflow": {
+                                        "id": "[resourceId('Microsoft.Logic/workflows', parameters('workflows_SendShortsEmail_name'))]"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {}
+            }
+        },
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_NewcastleEmail_name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('workflows_SendShortsEmail_name'))]"
+            ],
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "frequency": "Week",
+                                "interval": 1,
+                                "schedule": {
+                                    "hours": [
+                                        "6"
+                                    ],
+                                    "minutes": [
+                                        0
+                                    ],
+                                    "weekDays": [
+                                        "Monday",
+                                        "Tuesday",
+                                        "Wednesday",
+                                        "Thursday"
+                                    ]
+                                },
+                                "timeZone": "E. Australia Standard Time"
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "SendShortsEmail": {
+                            "runAfter": {},
+                            "type": "Workflow",
+                            "inputs": {
+                                "body": {
+                                    "BOMCode": "IDN11051",
+                                    "BOMLocation": "Newcastle",
+                                    "TemperatureWhenShortsAreAllowed": 30,
+                                    "emailTo": "SSWNewcastleAll@ssw.com.au"
                                 },
                                 "host": {
                                     "triggerName": "manual",
