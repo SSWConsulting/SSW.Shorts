@@ -1,6 +1,10 @@
-on: [push]
-
 name: AzureDeploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
 
