@@ -19,11 +19,9 @@ jobs:
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-    - name: Azure CLI script file
-      uses: azure/CLI@v1
-      with:
-        azcliversion: 2.0.72
-        inlineScript: |
-          chmod +x $GITHUB_WORKSPACE/deploy.sh
-          $GITHUB_WORKSPACE/deploy.sh
+        
+    - name: Deploy
+      shell: bash
+      run: |
+        chmod +x deploy.sh
+        ./deploy.sh
