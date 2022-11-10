@@ -7,7 +7,7 @@
             "type": "String"
         },
         "connections_office365_name": {
-            "defaultValue": "office365",
+            "defaultValue": "office365-1",
             "type": "String"
         },
         "workflows_GetForecast_name": {
