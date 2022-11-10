@@ -62,7 +62,7 @@
                 "displayName": "NoReply",
                 "customParameterValues": {},
                 "api": {
-                    "id": "[concat(variables('managedApiPrefix'), parameters('connections_office365_name'))]"
+                    "id": "[concat(variables('managedApiPrefix'), 'office365')]"
                 }
             }
         },
